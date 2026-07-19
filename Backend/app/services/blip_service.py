@@ -33,6 +33,10 @@ class BlipCaptionService:
         if self._initialized:
             return
         self.is_ready = False
+        # Kept for compatibility with code (like the health check endpoint) that
+        # reads blip_service.device. There is no local device anymore since the
+        # model runs on Hugging Face's servers, so this is just a descriptive label.
+        self.device = "huggingface-inference-api"
         self._initialized = True
 
     def load_model(self) -> None:
