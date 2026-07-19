@@ -46,6 +46,12 @@ class Settings(BaseSettings):
     MIN_CAPTION_LENGTH: int = 5
     NUM_BEAMS: int = 4
 
+    # Hugging Face Inference API (used instead of loading the BLIP model locally,
+    # so the backend can run on low-RAM free hosting tiers like Render's free plan)
+    # NOTE: never hardcode the real token here -- it is loaded from the .env file
+    # locally, and from Render's Environment Variables in production.
+    HF_API_TOKEN: str = ""
+
     # OCR Model (TrOCR)
     OCR_MODEL_NAME: str = "microsoft/trocr-base-printed"
     OCR_MAX_LENGTH: int = 128
