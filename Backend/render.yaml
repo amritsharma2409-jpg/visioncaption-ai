@@ -4,7 +4,7 @@ services:
     runtime: docker
     dockerfilePath: ./Dockerfile
     dockerContext: .
-    plan: standard
+    plan: free
     region: oregon
     healthCheckPath: /api/v1/health
     autoDeploy: true
@@ -20,7 +20,7 @@ services:
       - key: SECRET_KEY
         generateValue: true
       - key: CORS_ORIGINS
-        value: '["https://visioncaption.ai","https://www.visioncaption.ai"]'
+        value: '["https://visioncaption.ai","https://www.visioncaption.ai","http://localhost:3000"]'
       - key: DATABASE_URL
         value: sqlite+aiosqlite:///./visioncaption.db
       - key: MODEL_NAME
@@ -29,17 +29,9 @@ services:
         value: /app/model_cache
       - key: MODEL_DEVICE
         value: cpu
-      - key: OCR_MODEL_NAME
-        value: microsoft/trocr-base-printed
       - key: ENABLE_OCR
-        value: true
-      - key: DETECTION_MODEL_NAME
-        value: facebook/detr-resnet-50
+        value: false
       - key: ENABLE_OBJECT_DETECTION
-        value: true
+        value: false
       - key: LOG_LEVEL
         value: INFO
-    disk:
-      name: model-cache
-      mountPath: /app/model_cache
-      sizeGB: 5
