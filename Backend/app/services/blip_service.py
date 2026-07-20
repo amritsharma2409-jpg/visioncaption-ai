@@ -166,7 +166,7 @@ class BlipCaptionService:
                 "Content-Type": "application/json",
             }
             payload = {
-                "model": "Qwen/Qwen2-VL-7B-Instruct",
+                "model": "Qwen/Qwen2.5-VL-7B-Instruct",
                 "max_tokens": 100,
                 "messages": [
                     {
