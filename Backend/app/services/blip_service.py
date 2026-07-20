@@ -1,3 +1,4 @@
+import base64
 import io
 import socket
 import time
@@ -109,6 +110,35 @@ class BlipCaptionService:
             f"{last_network_error}"
         )
 
+    def _call_hf_api_with_retry_json(
+        self, api_url: str, headers: dict, payload: dict, max_network_retries: int = 3
+    ) -> requests.Response:
+        """Same as _call_hf_api_with_retry, but sends a JSON body (used by the
+        chat-completions style endpoint) instead of raw image bytes."""
+        last_network_error: Optional[Exception] = None
+
+        for attempt in range(max_network_retries):
+            try:
+                return requests.post(api_url, headers=headers, json=payload, timeout=60)
+            except (
+                requests.exceptions.ConnectionError,
+                requests.exceptions.Timeout,
+            ) as exc:
+                last_network_error = exc
+                wait_time = 2 * (attempt + 1)
+                logger.warning(
+                    f"Network error calling Hugging Face API (attempt "
+                    f"{attempt + 1}/{max_network_retries}): {exc}. "
+                    f"Retrying in {wait_time}s..."
+                )
+                if attempt < max_network_retries - 1:
+                    time.sleep(wait_time)
+
+        raise CaptionGenerationException(
+            f"Could not reach Hugging Face API after {max_network_retries} attempts: "
+            f"{last_network_error}"
+        )
+
     def generate_caption(
         self,
         image: Image.Image,
@@ -124,35 +154,57 @@ class BlipCaptionService:
             buffer = io.BytesIO()
             image.convert("RGB").save(buffer, format="JPEG")
             image_bytes = buffer.getvalue()
+            image_b64 = base64.b64encode(image_bytes).decode("utf-8")
 
-            api_url = f"https://router.huggingface.co/hf-inference/models/{settings.MODEL_NAME}"
-            headers = {"Authorization": f"Bearer {settings.HF_API_TOKEN}"}
+            # Use Hugging Face's chat-completions style Inference Providers API
+            # (the current, actively maintained way to call vision models),
+            # rather than the older per-model "hf-inference" endpoint, which
+            # rejects many models with "Model not supported by provider".
+            api_url = "https://router.huggingface.co/v1/chat/completions"
+            headers = {
+                "Authorization": f"Bearer {settings.HF_API_TOKEN}",
+                "Content-Type": "application/json",
+            }
+            payload = {
+                "model": "CohereLabs/aya-vision-32b:cohere",
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Describe this image in one concise, natural sentence.",
+                            },
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/jpeg;base64,{image_b64}"
+                                },
+                            },
+                        ],
+                    }
+                ],
+            }
 
             caption = None
 
-            # Hugging Face's free API can take a few seconds to "wake up" the model
-            # on the first request (cold start). Retry a few times if it's still loading.
-            for attempt in range(5):
-                response = self._call_hf_api_with_retry(api_url, headers, image_bytes)
+            for attempt in range(3):
+                response = self._call_hf_api_with_retry_json(api_url, headers, payload)
 
                 if response.status_code == 200:
                     result = response.json()
-                    if isinstance(result, list) and result and "generated_text" in result[0]:
-                        caption = result[0]["generated_text"].strip()
+                    try:
+                        caption = result["choices"][0]["message"]["content"].strip()
                         break
-                    raise CaptionGenerationException(f"Unexpected response format: {result}")
+                    except (KeyError, IndexError, TypeError):
+                        raise CaptionGenerationException(f"Unexpected response format: {result}")
 
                 if response.status_code == 503:
-                    wait_time = 3
-                    try:
-                        wait_time = float(response.json().get("estimated_time", 3))
-                    except Exception:
-                        pass
                     logger.info(
-                        f"Model is warming up on Hugging Face, waiting {wait_time:.1f}s "
-                        f"(attempt {attempt + 1}/5)..."
+                        f"Model is warming up on Hugging Face, waiting 5s "
+                        f"(attempt {attempt + 1}/3)..."
                     )
-                    time.sleep(min(wait_time, 15))
+                    time.sleep(5)
                     continue
 
                 raise CaptionGenerationException(
