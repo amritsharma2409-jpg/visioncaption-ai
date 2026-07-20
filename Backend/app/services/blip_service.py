@@ -166,7 +166,7 @@ class BlipCaptionService:
                 "Content-Type": "application/json",
             }
             payload = {
-                "model": "CohereLabs/aya-vision-32b",
+                "model": "Qwen/Qwen2-VL-7B-Instruct",
                 "max_tokens": 100,
                 "messages": [
                     {
