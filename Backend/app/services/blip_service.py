@@ -60,6 +60,39 @@ class BlipCaptionService:
     def unload_model(self) -> None:
         self.is_ready = False
 
+    def _call_hf_api_with_retry(
+        self, api_url: str, headers: dict, image_bytes: bytes, max_network_retries: int = 3
+    ) -> requests.Response:
+        """Calls the Hugging Face Inference API, retrying a few times if a
+        network-level error occurs (e.g. a transient DNS resolution failure on
+        the hosting provider's container). This is separate from the "model is
+        warming up" retry loop in generate_caption, which handles HTTP 503s."""
+        last_network_error: Optional[Exception] = None
+
+        for attempt in range(max_network_retries):
+            try:
+                return requests.post(
+                    api_url, headers=headers, data=image_bytes, timeout=60
+                )
+            except (
+                requests.exceptions.ConnectionError,
+                requests.exceptions.Timeout,
+            ) as exc:
+                last_network_error = exc
+                wait_time = 2 * (attempt + 1)
+                logger.warning(
+                    f"Network error calling Hugging Face API (attempt "
+                    f"{attempt + 1}/{max_network_retries}): {exc}. "
+                    f"Retrying in {wait_time}s..."
+                )
+                if attempt < max_network_retries - 1:
+                    time.sleep(wait_time)
+
+        raise CaptionGenerationException(
+            f"Could not reach Hugging Face API after {max_network_retries} attempts: "
+            f"{last_network_error}"
+        )
+
     def generate_caption(
         self,
         image: Image.Image,
@@ -84,9 +117,7 @@ class BlipCaptionService:
             # Hugging Face's free API can take a few seconds to "wake up" the model
             # on the first request (cold start). Retry a few times if it's still loading.
             for attempt in range(5):
-                response = requests.post(
-                    api_url, headers=headers, data=image_bytes, timeout=60
-                )
+                response = self._call_hf_api_with_retry(api_url, headers, image_bytes)
 
                 if response.status_code == 200:
                     result = response.json()
