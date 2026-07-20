@@ -119,7 +119,7 @@ class BlipCaptionService:
 
         for attempt in range(max_network_retries):
             try:
-                return requests.post(api_url, headers=headers, json=payload, timeout=60)
+                return requests.post(api_url, headers=headers, json=payload, timeout=90)
             except (
                 requests.exceptions.ConnectionError,
                 requests.exceptions.Timeout,
