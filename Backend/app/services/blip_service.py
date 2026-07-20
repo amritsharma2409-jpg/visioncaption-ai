@@ -125,7 +125,7 @@ class BlipCaptionService:
             image.convert("RGB").save(buffer, format="JPEG")
             image_bytes = buffer.getvalue()
 
-            api_url = f"https://api-inference.huggingface.co/models/{settings.MODEL_NAME}"
+            api_url = f"https://router.huggingface.co/hf-inference/models/{settings.MODEL_NAME}"
             headers = {"Authorization": f"Bearer {settings.HF_API_TOKEN}"}
 
             caption = None
