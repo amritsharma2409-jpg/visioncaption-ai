@@ -1,9 +1,11 @@
 import io
+import socket
 import time
 from threading import Lock
 from typing import Optional
 
 import requests
+import urllib3.util.connection as urllib3_cn
 from PIL import Image
 
 from app.config import settings
@@ -11,6 +13,20 @@ from app.core.exceptions import CaptionGenerationException, ModelNotReadyExcepti
 from app.core.logging_config import get_logger
 
 logger = get_logger(__name__)
+
+
+# Fix for a known Docker/hosting-provider networking issue: some containers
+# (including Render's free tier) report having an IPv6 network interface but
+# have no actual IPv6 route to the internet. Python's DNS resolution then
+# tries an IPv6 lookup first, gets no usable address, and fails with
+# "[Errno -5] No address associated with hostname" — even though a normal
+# IPv4 lookup would have worked fine. Forcing urllib3 (used by `requests`) to
+# only ever request IPv4 addresses avoids this entirely.
+def _allowed_gai_family():
+    return socket.AF_INET
+
+
+urllib3_cn.allowed_gai_family = _allowed_gai_family
 
 
 class BlipCaptionService:
