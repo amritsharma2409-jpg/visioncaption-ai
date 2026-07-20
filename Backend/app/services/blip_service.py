@@ -166,7 +166,8 @@ class BlipCaptionService:
                 "Content-Type": "application/json",
             }
             payload = {
-                "model": "CohereLabs/aya-vision-32b:cohere",
+                "model": "CohereLabs/aya-vision-32b",
+                "max_tokens": 100,
                 "messages": [
                     {
                         "role": "user",
