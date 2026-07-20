@@ -166,7 +166,7 @@ class BlipCaptionService:
                 "Content-Type": "application/json",
             }
             payload = {
-                "model": "zai-org/GLM-4.5V",
+                "model": "meta-llama/Llama-4-Scout-17B-16E-Instruct:groq",
                 "max_tokens": 100,
                 "messages": [
                     {
