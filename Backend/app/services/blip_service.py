@@ -167,7 +167,7 @@ class BlipCaptionService:
             }
             payload = {
                 "model": "zai-org/GLM-4.5V",
-                "max_tokens": 600,
+                "max_tokens": 300,
                 "messages": [
                     {
                         "role": "user",
