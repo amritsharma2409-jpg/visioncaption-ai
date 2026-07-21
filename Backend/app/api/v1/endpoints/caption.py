@@ -3,6 +3,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, Form, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.concurrency import run_in_threadpool
 
 from app.dependencies import get_current_user, get_db
 from app.models.caption_model import CaptionRecord, UserRecord
@@ -35,7 +36,16 @@ async def generate_caption(
 
     image = image_service.process_upload(image_bytes)
 
-    caption_text, confidence, processing_time_ms = blip_service.generate_caption(image)
+    # generate_caption() makes a blocking (synchronous) network call to the
+    # Hugging Face API that can take many seconds. Running it directly here
+    # would freeze this single worker's event loop for that whole time,
+    # meaning even Render's health check couldn't get a response — Render
+    # would then think the service is dead and force-restart it mid-request.
+    # run_in_threadpool runs it on a separate thread so the event loop stays
+    # free to keep answering other requests (like health checks) meanwhile.
+    caption_text, confidence, processing_time_ms = await run_in_threadpool(
+        blip_service.generate_caption, image
+    )
 
     response = CaptionResponse(
         id=str(uuid4()),
